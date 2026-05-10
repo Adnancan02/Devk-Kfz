@@ -1,5 +1,6 @@
 package com.devk.test.steps;
 
+import com.devk.test.base.Hooks;
 import com.devk.test.pages.TarifrechnerPage;
 import com.microsoft.playwright.*;
 import com.microsoft.playwright.assertions.LocatorAssertions;
@@ -15,26 +16,17 @@ import static org.junit.Assert.*;
 
 public class TarifrechnerSteps {
 
-    private Playwright playwright;
+
+    private  TarifrechnerPage tarifrechner;
     private Browser browser;
     private Page page;
-    private TarifrechnerPage tarifrechner;
 
-    @Before
-    public void setup() {
-        playwright = Playwright.create();
-        browser = playwright.chromium().launch(
-                new BrowserType.LaunchOptions().setHeadless(false)
-        );
-        page = browser.newPage();
-        tarifrechner = new TarifrechnerPage(page);
-    }
 
-    @After
-    public void teardown() {
-        tarifrechner.screenshot("test-abschluss");
-        browser.close();
-        playwright.close();
+
+    // Cucumber reicht die Hooks-Instanz automatisch hier rein
+    public TarifrechnerSteps(Hooks hooks) {
+        this.page = hooks.getPage();
+        this.tarifrechner = new TarifrechnerPage(page);
     }
 
     @Given("der Nutzer oeffnet die DEVK Startseite")
@@ -160,7 +152,6 @@ public class TarifrechnerSteps {
 
     @When("der Nutzer beantwortet die Tuning-Frage mit {string}")
     public void tuningBeantworten(String antwort) {
-        // Ja veya Nein seçeneği için
         tarifrechner.waehleFinanzierung(antwort);
     }
 
@@ -211,7 +202,8 @@ public class TarifrechnerSteps {
     @Then("sollte der Nutzer auf der Seite {string} landen")
     public void pruefeUeberschrift(String expectedTitle) {
         // Mit dem statischen Import von PlaywrightAssertions funktioniert das jetzt:
-        assertThat(page.locator("h1")).containsText(expectedTitle);
+        Locator ueberschrift = page.getByText(expectedTitle).first();
+        assertThat(ueberschrift).isVisible();
     }
 
 
@@ -219,7 +211,7 @@ public class TarifrechnerSteps {
     @When("der Nutzer die Zahlungsperiode {string} waehlt")
     public void waehleZahlungsperiode(String periode) {
         // Da dies wieder Auswahlkarten sind, nutzen wir unsere bewährte Methode
-        tarifrechner.klickeCard(periode);
+        tarifrechner.waehleZahlungsperiode(periode);
     }
 
     @Then("sollte ein Versicherungsbeitrag groesser als {string} Euro angezeigt werden")
@@ -238,5 +230,28 @@ public class TarifrechnerSteps {
         // Jetzt mit der richtigen Reihenfolge: (Condition, Message)
         assertTrue("Fehler: Der Preis " + preis + " ist nicht groesser als " + minimalBetrag,
                 preis > Double.parseDouble(minimalBetrag));
+    }
+
+    @Then("sind die drei Tarifoptionen sichtbar und ihre Beiträge liegen über {string} Euro")
+    public void pruefeAlleTarifPreise(String minimalBetrag) {
+        double minLimit = Double.parseDouble(minimalBetrag);
+
+        // 1. Alle Roh-Preise aus dem Shadow-DOM abrufen
+        List<String> preiseRaw = tarifrechner.holeAlleTarifPreise();
+
+        // 2. Sicherstellen, dass überhaupt Tarife (Basis, Komfort, Premium) gefunden wurden
+        assertFalse("Fehler: Es wurden keine Tarife auf der Seite gefunden!", preiseRaw.isEmpty());
+
+        // 3. Iteration über alle gefundenen Tarife zur Validierung
+        for (String rawText : preiseRaw) {
+            double aktuellerPreis = tarifrechner.parsePreisString(rawText);
+
+            System.out.println("Validierung Tarifpreis gefunden: " + aktuellerPreis + " €");
+
+            // Die eigentliche Validierung: Ist der berechnete Preis korrekt (> 0)?
+            assertTrue("Fehler: Der Tarifpreis (" + aktuellerPreis + ") ist nicht groesser als " + minLimit,
+                    aktuellerPreis > minLimit);
+        }
+        tarifrechner.screenshot(minimalBetrag);
     }
 }

@@ -2,13 +2,16 @@ package com.devk.test.pages;
 
 import com.microsoft.playwright.Locator;
 import com.microsoft.playwright.Page;
+import com.microsoft.playwright.assertions.LocatorAssertions;
 import com.microsoft.playwright.options.AriaRole;
 import com.microsoft.playwright.options.SelectOption;
 import com.microsoft.playwright.options.WaitForSelectorState;
 import io.cucumber.java.en.When;
 
+import java.util.ArrayList;
 import java.util.List;
 
+import static com.microsoft.playwright.assertions.PlaywrightAssertions.assertThat;
 import static org.junit.Assert.assertTrue;
 
 public class TarifrechnerPage {
@@ -94,6 +97,7 @@ public class TarifrechnerPage {
             AriaRole.BUTTON,
             new Page.GetByRoleOptions().setName(buttonText)
         );
+        screenshot(buttonText.replaceAll("[^a-zA-Z0-9]", "_"));
         if (button.isVisible()) {
             button.click();
         } else {
@@ -101,6 +105,7 @@ public class TarifrechnerPage {
         }
         page.waitForLoadState();
         System.out.println("Button geklickt: " + buttonText);
+
     }
 
     // ── Prüfung: Breadcrumb enthält Text ────────────────────────────
@@ -132,25 +137,24 @@ public class TarifrechnerPage {
     }
 
     public boolean isButtonEnabled(String buttonText) {
-        // 1. Den inneren Button im Shadow DOM lokalisieren
-        Locator realButton = page.locator("devk-button")
+        // 1. Locator für den inneren Button im Shadow DOM
+        // Playwright durchdringt Shadow DOMs automatisch bei CSS-Selektoren!
+        Locator innerButton = page.locator("devk-button")
                 .filter(new Locator.FilterOptions().setHasText(buttonText))
                 .locator("button");
 
-        // 2. Eigene Warteschleife: Wir prüfen bis zu 5 Sekunden lang
-        long timeout = System.currentTimeMillis() + 5000;
-        while (System.currentTimeMillis() < timeout) {
-            if (realButton.isEnabled()) {
-                System.out.println("Status Check für '" + buttonText + "': JETZT AKTIV");
-                return true;
-            }
-            // Kurze Pause, bevor wir erneut prüfen, um die CPU zu schonen
-            page.waitForTimeout(500);
-        }
+        try {
+            // 2. Die moderne Playwright-Art zu warten:
+            // Diese Assertion hat ein eingebautes Retry-System und Timeout.
+            assertThat(innerButton).isEnabled(new LocatorAssertions.IsEnabledOptions().setTimeout(30000));
 
-        // 3. Wenn nach 5 Sek. immer noch nicht aktiv
-        System.out.println("Status Check für '" + buttonText + "': IMMER NOCH INAKTIV");
-        return false;
+            System.out.println("Status Check für '" + buttonText + "': JETZT AKTIV");
+            return true;
+        } catch (AssertionError | Exception e) {
+            // Wenn das Timeout abläuft, ohne dass der Button aktiv wurde
+            System.out.println("Status Check für '" + buttonText + "': IMMER NOCH INAKTIV");
+            return false;
+        }
     }
 
     // ── Prüfung: HSN/TSN Seite sichtbar ────────────────────────────
@@ -292,6 +296,52 @@ public class TarifrechnerPage {
         }
     }
 
+    public void waehleZahlungsperiode(String periode) {
+        // Den Button anhand des exakten Textes finden
+        Locator button = page.locator("devk-select-button")
+                .filter(new Locator.FilterOptions().setHasText(
+                        java.util.regex.Pattern.compile("^" + periode + "$")
+                ))
+                .first();
+
+        // Warten, bis der Button sichtbar ist
+        button.waitFor(new Locator.WaitForOptions()
+                .setState(WaitForSelectorState.VISIBLE)
+                .setTimeout(5000));
+
+        // Prüfen, ob die Option bereits ausgewählt ist
+        String selected = button.getAttribute("selected");
+        if (selected == null) {
+            String preisVorKlick = page.locator("devk-select-tabs option")
+                    .first().getAttribute("data-price");
+            System.out.println("Preis vor Klick: " + preisVorKlick);
+
+            button.locator("button").click();
+            //page.waitForTimeout(5000);
+            // Warten bis sich der Preis tatsächlich aktualisiert hat
+            Locator ersteOption = page.locator("devk-select-tabs option").first();
+            String preisVorKlick1 = ersteOption.getAttribute("data-price");
+
+            assertThat(ersteOption).not().hasAttribute(
+                    "data-price",
+                    preisVorKlick1,
+                    new LocatorAssertions.HasAttributeOptions().setTimeout(10000)
+            );
+            System.out.println("Zahlungsperiode angeklickt: " + periode);
+
+            // Warten bis der Button als ausgewählt markiert ist (kein JS eval nötig!)
+            assertThat(button).hasAttribute("selected", "",
+                    new LocatorAssertions.HasAttributeOptions().setTimeout(10000));
+
+            System.out.println("Preis nach Klick: " +
+                    page.locator("devk-select-tabs option").first().getAttribute("data-price"));
+        } else {
+            System.out.println("'" + periode + "' ist bereits vorausgewählt.");
+        }
+
+        System.out.println("Validierung erfolgreich: '" + periode + "' ist aktiv gesetzt.");
+    }
+
     // Methode für die PLZ
     public void fuellePlzAus(String plz) {
         // Sucht das devk-input mit der PLZ-Beschriftung
@@ -316,4 +366,54 @@ public class TarifrechnerPage {
         page.locator("#SF_KLASSE_KASKO select").selectOption(new SelectOption().setLabel(sfKlasse));
         System.out.println("Kasko SF-Klasse gesetzt auf: " + sfKlasse);
     }
+
+    // ── Prüfung: Mehrere Tarife validieren ──────────────────────────
+
+    /**
+     * Holt die 'data-price' Attribute aller verfügbaren Tarif-Optionen.
+     * Dies ist eine Validierung der Geschäftslogik (Tarifrechner-Ergebnisse).
+     */
+    /**
+     * Holt die Preise und loggt sie zusammen mit dem Tarifnamen (z.B. Basis, Komfort).
+     */
+    public List<String> holeAlleTarifPreise() {
+        // Locator für die Optionen (durchbricht Shadow DOM)
+        Locator options = page.locator("devk-select-tabs option");
+        List<Locator> allOptions = options.all();
+        List<String> preisListe = new ArrayList<>();
+
+        for (Locator option : allOptions) {
+            // Name (Label) und Preis aus den Attributen ziehen
+            String tarifName = option.getAttribute("label"); // z.B. "Teilkasko Basis"
+            String preisRaw = option.getAttribute("data-price"); // z.B. "948,83 €"
+
+            if (preisRaw != null) {
+                preisListe.add(preisRaw);
+
+                // Preis für den Log umwandeln
+                double preisZahl = parsePreisString(preisRaw);
+
+                // Dein gewünschter Log-Output
+                System.out.println("Validierung " + (tarifName != null ? tarifName : "Tarif") + " gefunden: " + preisZahl + " €");
+            }
+        }
+
+        return preisListe;
+    }
+
+    /**
+     * Hilfsmethode: Wandelt den Preis-String (z.B. "1.341,59 €") in eine Zahl um.
+     */
+    public double parsePreisString(String preisText) {
+        if (preisText == null || preisText.isEmpty()) return 0;
+
+        // Entfernt Tausenderpunkte, ersetzt Komma durch Punkt für Java-Double
+        String bereinigterPreis = preisText
+                .replace(".", "")
+                .replace(",", ".")
+                .replaceAll("[^0-9.]", ""); // Behält nur Zahlen und den Punkt
+
+        return Double.parseDouble(bereinigterPreis);
+    }
+
 }

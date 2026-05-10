@@ -13,12 +13,13 @@ dependencies {
     // Cucumber - BDD Framework
     testImplementation("io.cucumber:cucumber-java:7.15.0")
     testImplementation("io.cucumber:cucumber-junit:7.15.0")
+    testImplementation("io.cucumber:cucumber-picocontainer:7.15.0")
 
     // JUnit - Test Runner
     testImplementation("junit:junit:4.13.2")
 
     // Allure - Berichterstattung
-    //testImplementation("io.qameta.allure:allure-cucumber7-jvm:2.25.0")
+    testImplementation("io.qameta.allure:allure-cucumber7-jvm:2.25.0")
 }
 
 java {
