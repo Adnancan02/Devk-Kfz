@@ -32,6 +32,7 @@ public class TarifrechnerSteps {
     @Given("der Nutzer oeffnet die DEVK Startseite")
     public void nutzerOeffnetStartseite() {
         tarifrechner.navigiereZurStartseite();
+        tarifrechner.cookiesAblehnen();
     }
 
     @Given("der Nutzer lehnt die Cookies ab")

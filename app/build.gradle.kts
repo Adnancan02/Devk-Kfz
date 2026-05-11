@@ -35,7 +35,11 @@ tasks.withType<JavaCompile> {
 }
 
 tasks.test {
+    useJUnit();
     // UTF-8 für Test-Ausführung
     systemProperty("file.encoding", "UTF-8")
-    //systemProperty("cucumber.options", "--plugin io.qameta.allure.cucumber7jvm.AllureCucumber7Jvm")
+
+    listOf("browser", "headless", "baseUrl", "timeout", "keepVideos", "cucumber.filter.tags").forEach {
+        System.getProperty(it)?.let { value -> systemProperty(it, value) }
+    }
 }

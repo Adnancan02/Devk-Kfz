@@ -4,27 +4,25 @@ Feature: KFZ-Tarifrechner – Online Versicherung berechnen
   @happy-path
   Scenario: Nutzer berechnet erfolgreich einen PKW-Tarif
     Given der Nutzer oeffnet die DEVK Startseite
-    #bunu burdan cikar
-    And der Nutzer lehnt die Cookies ab
-    Then die Sektion "Unsere beliebtesten Versicherungen" ist sichtbar
+    When die Sektion "Unsere beliebtesten Versicherungen" ist sichtbar
     And die folgenden Versicherungskarten sind sichtbar:
       | Autoversicherung         |
       | Rechtsschutzversicherung |
       | Haftpflichtversicherung  |
       | Gebäudeversicherung      |
       | Hausratversicherung      |
-    When der Nutzer klickt auf "Autoversicherung"
-    Then die Seite "Kfz-Versicherung>Pkw" wird angezeigt
-    When der Nutzer klickt auf "Online berechnen"
-    Then der Breadcrumb enthaelt "Rechner"
-    Then der Button "Weiter zur Fahrzeugauswahl" ist "inaktiv"
-    When der Nutzer waehlt "Versicherung wechseln"
-    Then der Button "Weiter zur Fahrzeugauswahl" ist "aktiv"
-    When der Nutzer klickt auf "Weiter zur Fahrzeugauswahl"
-    Then der Button "Weiter zu Ihrer Fahrzeugzulassung" ist "inaktiv"
+    And der Nutzer klickt auf "Autoversicherung"
+    And die Seite "Kfz-Versicherung>Pkw" wird angezeigt
+    And der Nutzer klickt auf "Online berechnen"
+    And der Breadcrumb enthaelt "Rechner"
+    And der Button "Weiter zur Fahrzeugauswahl" ist "inaktiv"
+    And der Nutzer waehlt "Versicherung wechseln"
+    And der Button "Weiter zur Fahrzeugauswahl" ist "aktiv"
+    And der Nutzer klickt auf "Weiter zur Fahrzeugauswahl"
+    And der Button "Weiter zu Ihrer Fahrzeugzulassung" ist "inaktiv"
     And der Nutzer gibt HSN "0005" und TSN "APT" ein
-    Then der Button "Weiter zu Ihrer Fahrzeugzulassung" ist "aktiv"
-    When der Nutzer klickt auf "Weiter zu Ihrer Fahrzeugzulassung"
+    And der Button "Weiter zu Ihrer Fahrzeugzulassung" ist "aktiv"
+    And der Nutzer klickt auf "Weiter zu Ihrer Fahrzeugzulassung"
     And der Nutzer gibt die Erstzulassung Ihres Fahrzeugs "30.05.2012" ein
     And der Nutzer das Datum der Zulassung auf sich selbst "24.03.2024" eingibt
     And der Nutzer den Versicherungsbeginn "01.06.2026" eingibt
