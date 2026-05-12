@@ -44,24 +44,6 @@ public class TarifrechnerPage {
         }
     }
 
-    public void clickByTestId(String testId) {
-        Locator element = page.locator("[data-testid='" + testId + "']").first();
-        element.waitFor(new Locator.WaitForOptions()
-                .setState(WaitForSelectorState.VISIBLE)
-                .setTimeout(TestConfig.defaultTimeoutMillis()));
-        element.click();
-    }
-
-    public void clickByText(String text) {
-        Locator button = page.getByRole(AriaRole.BUTTON, new Page.GetByRoleOptions().setName(text)).first();
-        if (button.isVisible()) {
-            button.click();
-            return;
-        }
-
-        page.getByText(text, new Page.GetByTextOptions().setExact(true)).first().click();
-    }
-
     public boolean versicherungskarteIstSichtbar(String name) {
         Locator karte = page.locator("span.b-text--h5")
                 .filter(new Locator.FilterOptions().setHasText(name))
@@ -75,15 +57,6 @@ public class TarifrechnerPage {
                 .first()
                 .isVisible();
     }
-
-    public void versicherungskarteKlicken(String name) {
-        page.locator("span.b-text--h5")
-                .filter(new Locator.FilterOptions().setHasText(name))
-                .first()
-                .click();
-        page.waitForLoadState();
-    }
-
     public void buttonKlicken(String buttonText) {
         screenshot(buttonText.replaceAll("[^a-zA-Z0-9]", "_"));
 
@@ -198,22 +171,6 @@ public class TarifrechnerPage {
                 .first();
         kaufpreisInput.fill(preis);
         kaufpreisInput.press("Tab");
-    }
-
-    public void klickeOption(String optionText) {
-        Locator option = page.locator("devk-button")
-                .filter(new Locator.FilterOptions().setHasText(optionText))
-                .locator("button")
-                .first();
-
-        try {
-            option.waitFor(new Locator.WaitForOptions()
-                    .setState(WaitForSelectorState.VISIBLE)
-                    .setTimeout(TestConfig.defaultTimeoutMillis()));
-            option.click();
-        } catch (RuntimeException e) {
-            page.getByRole(AriaRole.BUTTON, new Page.GetByRoleOptions().setName(optionText)).first().click();
-        }
     }
 
     public void waehleFinanzierung(String optionText) {
