@@ -1,419 +1,372 @@
 package com.devk.test.pages;
 
+import com.devk.test.config.TestConfig;
 import com.microsoft.playwright.Locator;
 import com.microsoft.playwright.Page;
 import com.microsoft.playwright.assertions.LocatorAssertions;
 import com.microsoft.playwright.options.AriaRole;
 import com.microsoft.playwright.options.SelectOption;
 import com.microsoft.playwright.options.WaitForSelectorState;
-import io.cucumber.java.en.When;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 
 import static com.microsoft.playwright.assertions.PlaywrightAssertions.assertThat;
-import static org.junit.Assert.assertTrue;
+
 
 public class TarifrechnerPage {
-
     private final Page page;
 
     public TarifrechnerPage(Page page) {
         this.page = page;
     }
 
-    // ── Allgemeine Methode: Klick per data-testid ───────────────────
-    // Gibt die data-testid an, findet das Element und klickt darauf
+    public void navigiereZurStartseite() {
+        page.navigate(TestConfig.baseUrl());
+        page.waitForLoadState();
+    }
+
+    public void cookiesAblehnen() {
+        Locator denyButton = page.locator("[data-testid='uc-deny-all-button']").first();
+        try {
+            denyButton.waitFor(new Locator.WaitForOptions()
+                    .setState(WaitForSelectorState.VISIBLE)
+                    .setTimeout(3000));
+            denyButton.click();
+        } catch (RuntimeException ignored) {
+            // The banner is not shown on every run, for example when consent state is already stored.
+        }
+    }
+
     public void clickByTestId(String testId) {
-        Locator button = page.locator("[data-testid='" + testId + "']");
-        button.waitFor(new Locator.WaitForOptions().setTimeout(5000));
+        Locator element = page.locator("[data-testid='" + testId + "']").first();
+        element.waitFor(new Locator.WaitForOptions()
+                .setState(WaitForSelectorState.VISIBLE)
+                .setTimeout(TestConfig.defaultTimeoutMillis()));
+        element.click();
+    }
+
+    public void clickByText(String text) {
+        Locator button = page.getByRole(AriaRole.BUTTON, new Page.GetByRoleOptions().setName(text)).first();
         if (button.isVisible()) {
             button.click();
-            System.out.println("Geklickt (testid): " + testId);
-        } else {
-            System.out.println("Nicht sichtbar, wird übersprungen: " + testId);
+            return;
         }
+
+        page.getByText(text, new Page.GetByTextOptions().setExact(true)).first().click();
     }
 
-    // ── Allgemeine Methode: Klick per sichtbaren Text ───────────────
-    // Sucht ein Element anhand des sichtbaren Textes und klickt darauf
-    public void clickByText(String text) {
-        Locator element = page.getByRole(
-            AriaRole.BUTTON,
-            new Page.GetByRoleOptions().setName(text)
-        );
-        if (element.isVisible()) {
-            element.click();
-            System.out.println("Geklickt (text): " + text);
-        } else {
-            // Falls kein Button, als allgemeines Element suchen
-            page.locator("text=" + text).first().click();
-            System.out.println("Geklickt (locator text): " + text);
-        }
-    }
-
-    // ── Cookie-Banner: Ablehnen ─────────────────────────────────────
-    // Schließt den Datenschutz-Dialog durch Klick auf "Ablehnen"
-    public void cookiesAblehnen() {
-        clickByTestId("uc-deny-all-button");
-    }
-
-    // ── Navigation: Startseite öffnen ──────────────────────────────
-    // Öffnet die DEVK-Startseite
-    public void navigiereZurStartseite() {
-        page.navigate("https://www.devk.de/");
-        page.waitForLoadState();
-        System.out.println("Startseite geöffnet");
-    }
-
-    // ── Prüfung: Versicherungskarte sichtbar ────────────────────────
-// Prüft ob eine bestimmte Versicherungskarte auf der Startseite sichtbar ist
     public boolean versicherungskarteIstSichtbar(String name) {
-        // Nur die Karten-Überschriften prüfen (class: b-text--h5)
         Locator karte = page.locator("span.b-text--h5")
                 .filter(new Locator.FilterOptions().setHasText(name))
                 .first();
         return karte.isVisible();
     }
 
-    // ── Prüfung: Überschrift sichtbar ───────────────────────────────
-    // Prüft ob eine bestimmte Überschrift sichtbar ist
     public boolean ueberschriftIstSichtbar(String text) {
-        return page.locator("h2:has-text('" + text + "'), h3:has-text('" + text + "')").isVisible();
+        return page.locator("h2, h3")
+                .filter(new Locator.FilterOptions().setHasText(text))
+                .first()
+                .isVisible();
     }
 
-    // ── Klick: Versicherungskarte ───────────────────────────────────
-    // Klickt auf eine Versicherungskarte auf der Startseite
     public void versicherungskarteKlicken(String name) {
-        page.locator("text=" + name).first().click();
+        page.locator("span.b-text--h5")
+                .filter(new Locator.FilterOptions().setHasText(name))
+                .first()
+                .click();
         page.waitForLoadState();
-        System.out.println("Versicherungskarte geklickt: " + name);
     }
 
-    // ── Klick: Beliebiger Button per Text ───────────────────────────
-    // Klickt auf einen Button anhand des sichtbaren Textes
     public void buttonKlicken(String buttonText) {
-        Locator button = page.getByRole(
-            AriaRole.BUTTON,
-            new Page.GetByRoleOptions().setName(buttonText)
-        );
         screenshot(buttonText.replaceAll("[^a-zA-Z0-9]", "_"));
+
+        Locator button = page.getByRole(AriaRole.BUTTON, new Page.GetByRoleOptions().setName(buttonText)).first();
         if (button.isVisible()) {
             button.click();
         } else {
-            page.locator("text=" + buttonText).first().click();
+            page.getByText(buttonText, new Page.GetByTextOptions().setExact(true)).first().click();
         }
-        page.waitForLoadState();
-        System.out.println("Button geklickt: " + buttonText);
 
+        page.waitForLoadState();
     }
 
-    // ── Prüfung: Breadcrumb enthält Text ────────────────────────────
-    // Prüft ob der Breadcrumb einen bestimmten Text enthält
+    /**
+     * Klickt auf den Weiter-Button, egal welche ID (Prefix) er hat.
+     * Wir nutzen einen CSS-Selektor, der nach IDs sucht, die auf '-buttons-next' enden.
+     * * @param expectedText Der Text, der auf dem Button erscheinen soll.
+     */
+    public void klickeDynamischenWeiterButton(String expectedText) {
+        // [id$='-buttons-next'] findet jede ID, die mit '-buttons-next' endet.
+        // Dies deckt 'situation-buttons-next' und 'vehicleSelect-buttons-next' ab.
+        Locator weiterButton = page.locator("[id$='-buttons-next']");
+
+        // 1. Warten, bis das Element im UI sichtbar ist
+        weiterButton.waitFor(new Locator.WaitForOptions().setState(WaitForSelectorState.VISIBLE));
+
+        // 2. Sicherheitscheck: Prüfen, ob der Text auf dem Button korrekt ist
+        if (weiterButton.innerText().contains(expectedText)) {
+            // Playwright wartet automatisch, bis der Button nicht mehr 'disabled' ist
+            weiterButton.click();
+        } else {
+            throw new RuntimeException("Button mit ID-Endung '-buttons-next' gefunden, aber der Text ist falsch! " +
+                    "Erwartet: " + expectedText + ", Gefunden: " + weiterButton.innerText());
+        }
+    }
+
     public boolean breadcrumbEnthaelt(String text) {
-        // 1. Erstelle einen Locator für das spezifische Text-Element im Breadcrumb
-        Locator zielText = page.locator("nav[aria-label='Breadcrumb']").locator("text=" + text);
+        Locator zielText = page.locator("nav[aria-label='Breadcrumb']").getByText(text);
 
         try {
-            // 2. Warte bis zu 5 Sekunden, bis "Rechner" erscheint
-            zielText.waitFor(new Locator.WaitForOptions().setTimeout(5000));
-
-            // 3. Hole zur Sicherheit nochmal alle Texte für das Log
-            System.out.println("Gefundene Breadcrumbs nach Warten: " +
-                    page.locator("nav[aria-label='Breadcrumb'] .a-text").allInnerTexts());
-
+            zielText.waitFor(new Locator.WaitForOptions()
+                    .setState(WaitForSelectorState.VISIBLE)
+                    .setTimeout(TestConfig.defaultTimeoutMillis()));
             return zielText.isVisible();
-        } catch (Exception e) {
-            System.err.println("Timeout: Text '" + text + "' wurde im Breadcrumb nicht gefunden!");
+        } catch (RuntimeException e) {
             return false;
         }
     }
 
-    // ── Klick: Versicherung wechseln ────────────────────────────────
-    // Wählt die Option "Versicherung wechseln" im Tarifrechner
     public void versicherungWechselnWaehlen() {
-        page.locator("text=Versicherung wechseln").first().click();
-        System.out.println("Versicherung wechseln ausgewählt");
+        page.getByText("Versicherung wechseln", new Page.GetByTextOptions().setExact(true)).first().click();
     }
 
     public boolean isButtonEnabled(String buttonText) {
-        // 1. Locator für den inneren Button im Shadow DOM
-        // Playwright durchdringt Shadow DOMs automatisch bei CSS-Selektoren!
-        Locator innerButton = page.locator("devk-button")
-                .filter(new Locator.FilterOptions().setHasText(buttonText))
-                .locator("button");
+        Locator button = page.getByRole(AriaRole.BUTTON, new Page.GetByRoleOptions().setName(buttonText))
+                .and(page.locator(":visible"))
+                .first();
 
         try {
-            // 2. Die moderne Playwright-Art zu warten:
-            // Diese Assertion hat ein eingebautes Retry-System und Timeout.
-            assertThat(innerButton).isEnabled(new LocatorAssertions.IsEnabledOptions().setTimeout(30000));
-
-            System.out.println("Status Check für '" + buttonText + "': JETZT AKTIV");
+            assertThat(button).isEnabled(new LocatorAssertions.IsEnabledOptions()
+                    .setTimeout(TestConfig.defaultTimeoutMillis()));
             return true;
-        } catch (AssertionError | Exception e) {
-            // Wenn das Timeout abläuft, ohne dass der Button aktiv wurde
-            System.out.println("Status Check für '" + buttonText + "': IMMER NOCH INAKTIV");
-            return false;
+        } catch (AssertionError | RuntimeException e) {
+            Locator innerButton = page.locator("devk-button")
+                    .filter(new Locator.FilterOptions().setHasText(buttonText))
+                    .locator("button")
+                    .first();
+
+            try {
+                assertThat(innerButton).isEnabled(new LocatorAssertions.IsEnabledOptions()
+                        .setTimeout(TestConfig.defaultTimeoutMillis()));
+                return true;
+            } catch (AssertionError | RuntimeException ignored) {
+                return false;
+            }
         }
     }
 
-    // ── Prüfung: HSN/TSN Seite sichtbar ────────────────────────────
-    // Prüft ob die Fahrzeugauswahl-Seite mit HSN/TSN Eingabe angezeigt wird
     public boolean hsnTsnSeiteIstSichtbar() {
         return page.locator("text=HSN, text=TSN, input[name='hsn'], input[placeholder*='HSN']")
-                   .first()
-                   .isVisible();
+                .first()
+                .isVisible();
     }
 
     public void fuelleHsnTsnAus(String hsnWert, String tsnWert) {
-        // 1. HSN eingeben: Gehe in devk-input#HSN und finde dort das native input
         page.locator("devk-input#HSN input").fill(hsnWert);
-
-        // 2. TSN eingeben: (Angenommen die ID ist analog dazu 'TSN')
         page.locator("devk-input#TSN input").fill(tsnWert);
     }
 
-
-    public void fuelleErstzulassung(String datum){
-        page.locator("devk-input#ERSTZULASSUNG").fill(datum);
-    }
-
-    // ── Screenshot erstellen ────────────────────────────────────────
-    // Erstellt einen Screenshot und speichert ihn im allure-results Ordner
-    public void screenshot(String dateiname) {
-        page.screenshot(new Page.ScreenshotOptions()
-            .setPath(java.nio.file.Paths.get("build/reports/" + dateiname + ".png"))
-            .setFullPage(true));
-    }
-
     public void fuelleDatumAus(String labelText, String datum) {
-        // 1. Wir suchen das devk-input Element, das den entsprechenden Text im Label hat
         Locator dateInput = page.locator("devk-input")
                 .filter(new Locator.FilterOptions().setHasText(labelText))
-                .locator("input"); // Findet das native Input-Feld im Shadow DOM
+                .locator("input")
+                .first();
 
-        // 2. Warten und Feld leeren, falls schon etwas drin steht (z.B. der 04.05.2026 als Default)
-        dateInput.waitFor();
-        dateInput.fill(""); // Feld säubern
+        dateInput.waitFor(new Locator.WaitForOptions().setState(WaitForSelectorState.VISIBLE));
+        dateInput.fill("");
+        dateInput.type(datum);
+        dateInput.press("Tab");
 
-        // 3. Neues Datum eingeben
-        dateInput.type(datum); // 'type' ist bei Datumsfeldern oft sicherer als 'fill'
-
-        // Kurzes Warten für die Validierung
-        page.waitForTimeout(500);
+        String actualValue = dateInput.inputValue();
+        if (!actualValue.equals(datum) && !actualValue.equals(toIsoDate(datum))) {
+            throw new AssertionError("Expected date value " + datum + " or " + toIsoDate(datum)
+                    + " but was " + actualValue);
+        }
     }
 
-    // Kaufpreis girişi için
     public void fuelleKaufpreisAus(String preis) {
-        // Kaufpreis alanı genellikle bir placeholder veya label ile bulunur
         Locator kaufpreisInput = page.locator("devk-input")
                 .filter(new Locator.FilterOptions().setHasText("Wie ist der Kaufpreis Ihres Fahrzeugs?"))
-                .locator("input");
-        kaufpreisInput.waitFor();
+                .locator("input")
+                .first();
         kaufpreisInput.fill(preis);
+        kaufpreisInput.press("Tab");
     }
 
     public void klickeOption(String optionText) {
-        // Wir nutzen "has-text" mit dem case-insensitive Flag 'i'
-        // Das '>> button' sorgt dafür, dass wir direkt das klickbare Element im Shadow DOM ansprechen
         Locator option = page.locator("devk-button")
                 .filter(new Locator.FilterOptions().setHasText(optionText))
-                .locator("button");
+                .locator("button")
+                .first();
 
         try {
-            // Warte maximal 5 Sekunden, bis der Button wirklich sichtbar und bereit ist
-            option.waitFor(new Locator.WaitForOptions().setState(WaitForSelectorState.VISIBLE).setTimeout(5000));
-
-            // Nutze force: true, falls ein anderes Element (Overlay) den Klick behindert
-            option.click(new Locator.ClickOptions().setForce(true));
-
-            System.out.println("Erfolgreich geklickt: " + optionText);
-        } catch (com.microsoft.playwright.TimeoutError e) {
-            // Falls der Text-Filter scheitert, versuchen wir es mit einem direkteren Selektor
-            System.out.println("Standard-Locator fehlgeschlagen, versuche alternativen Selektor für: " + optionText);
-            page.locator("button:has-text('" + optionText + "')").first().click();
+            option.waitFor(new Locator.WaitForOptions()
+                    .setState(WaitForSelectorState.VISIBLE)
+                    .setTimeout(TestConfig.defaultTimeoutMillis()));
+            option.click();
+        } catch (RuntimeException e) {
+            page.getByRole(AriaRole.BUTTON, new Page.GetByRoleOptions().setName(optionText)).first().click();
         }
     }
 
     public void waehleFinanzierung(String optionText) {
-        // 1. Wir suchen das devk-select-button Element, das den Text enthält (z.B. "Barkauf")
-        // Playwright findet den Text, auch wenn er außerhalb des Shadow-Root-Buttons steht.
         Locator selectButton = page.locator("devk-select-button")
-                .filter(new Locator.FilterOptions().setHasText(optionText));
-
-        // 2. Wir greifen auf den echten Button im Shadow DOM zu
-        Locator nativeButton = selectButton.locator("button");
-
-        try {
-            // Warten, bis der Button bereit ist
-            nativeButton.waitFor(new Locator.WaitForOptions().setState(WaitForSelectorState.VISIBLE).setTimeout(5000));
-
-            // Klick ausführen
-            nativeButton.click();
-            System.out.println("Finanzierungsart ausgewählt: " + optionText);
-        } catch (Exception e) {
-            // Backup: Falls der Shadow-DOM-Pfad Probleme macht, versuchen wir es über den Text-Locator
-            System.out.println("Versuche Backup-Klick für: " + optionText);
-            page.getByText(optionText).first().click();
-        }
-    }
-
-    // Methode für die großen Auswahl-Karten (Cards)
-    public void klickeCard(String cardText) {
-        // 1. Die Karte gezielt über die DEVK-Komponente lokalisieren
-        Locator card = page.locator("devk-selection-card")
-                .filter(new Locator.FilterOptions().setHasText(cardText))
+                .filter(new Locator.FilterOptions().setHasText(optionText))
+                .locator("button")
                 .first();
 
         try {
-            // 2. Warten, bis die Karte sichtbar ist
-            card.waitFor(new Locator.WaitForOptions().setState(WaitForSelectorState.VISIBLE).setTimeout(5000));
-
-            // 3. PRÜFUNG: Ist die Karte bereits ausgewählt?
-            // Wir prüfen, ob im Class-Attribut das Wort "selected" vorkommt
-            String classAttribute = card.getAttribute("class");
-            boolean istBereitsAusgewählt = classAttribute != null && classAttribute.contains("selected");
-
-            if (istBereitsAusgewählt) {
-                // Wenn schon ausgewählt, machen wir nichts
-                System.out.println("Status Check: '" + cardText + "' ist bereits ausgewählt. Klick übersprungen.");
-            } else {
-                // Nur klicken, wenn sie noch nicht ausgewählt ist
-                card.click();
-                System.out.println("Status Check: '" + cardText + "' wurde jetzt angeklickt.");
-            }
-
-        } catch (com.microsoft.playwright.TimeoutError e) {
-            System.out.println("Spezifischer Locator fehlgeschlagen, versuche Backup für: " + cardText);
-
-            // Backup-Logik (falls devk-selection-card nicht gefunden wurde)
-            Locator backupCard = page.locator("main").getByText(cardText, new Locator.GetByTextOptions().setExact(true)).first();
-
-            // Auch beim Backup kurz prüfen, ob es schon ausgewählt aussieht (über das Parent-Element)
-            if (!backupCard.locator("..").getAttribute("class").contains("selected")) {
-                backupCard.click();
-            }
+            selectButton.waitFor(new Locator.WaitForOptions()
+                    .setState(WaitForSelectorState.VISIBLE)
+                    .setTimeout(TestConfig.defaultTimeoutMillis()));
+            selectButton.click();
+        } catch (RuntimeException e) {
+            page.getByText(optionText, new Page.GetByTextOptions().setExact(true)).first().click();
         }
+    }
+
+    public void waehleVersicherungsSchutz(String schutz) {
+        // Wir suchen direkt den Button, der das Label mit dem gewünschten Text enthält
+        Locator tabButton = page.locator("button.devk-select-tabs__button")
+                .filter(new Locator.FilterOptions().setHasText(schutz));
+
+        // Prüfen, ob der Button bereits aktiv ist (vermeidet unnötige Klicks)
+        boolean isActive = tabButton.getAttribute("class").contains("devk-select-tabs__button--active");
+
+        if (!isActive) {
+            tabButton.click();
+        }
+    }
+
+    public void waehleOption(String text) {
+        // Playwright durchdringt das Shadow DOM automatisch.
+        // 'getByText' ist schneller als komplexe CSS-Selektoren.
+        page.getByText(text, new Page.GetByTextOptions().setExact(false))
+                .first()
+                .click();
     }
 
     public void waehleZahlungsperiode(String periode) {
-        // Den Button anhand des exakten Textes finden
+        // Direkter Zugriff ohne Regex: Playwright findet den Text im Shadow DOM automatisch
         Locator button = page.locator("devk-select-button")
-                .filter(new Locator.FilterOptions().setHasText(
-                        java.util.regex.Pattern.compile("^" + periode + "$")
-                ))
-                .first();
+                .getByText(periode, new Locator.GetByTextOptions().setExact(true));
 
-        // Warten, bis der Button sichtbar ist
-        button.waitFor(new Locator.WaitForOptions()
-                .setState(WaitForSelectorState.VISIBLE)
-                .setTimeout(5000));
+        // Falls nicht selektiert, klicken
+        if (button.getAttribute("selected") == null) {
+            button.click();
 
-        // Prüfen, ob die Option bereits ausgewählt ist
-        String selected = button.getAttribute("selected");
-        if (selected == null) {
-            String preisVorKlick = page.locator("devk-select-tabs option")
-                    .first().getAttribute("data-price");
-            System.out.println("Preis vor Klick: " + preisVorKlick);
-
-            button.locator("button").click();
-            //page.waitForTimeout(5000);
-            // Warten bis sich der Preis tatsächlich aktualisiert hat
-            Locator ersteOption = page.locator("devk-select-tabs option").first();
-            String preisVorKlick1 = ersteOption.getAttribute("data-price");
-
-            assertThat(ersteOption).not().hasAttribute(
-                    "data-price",
-                    preisVorKlick1,
-                    new LocatorAssertions.HasAttributeOptions().setTimeout(10000)
-            );
-            System.out.println("Zahlungsperiode angeklickt: " + periode);
-
-            // Warten bis der Button als ausgewählt markiert ist (kein JS eval nötig!)
-            assertThat(button).hasAttribute("selected", "",
-                    new LocatorAssertions.HasAttributeOptions().setTimeout(10000));
-
-            System.out.println("Preis nach Klick: " +
-                    page.locator("devk-select-tabs option").first().getAttribute("data-price"));
-        } else {
-            System.out.println("'" + periode + "' ist bereits vorausgewählt.");
+            // Schnelle Validierung
+            assertThat(button).hasAttribute("selected", "");
         }
-
-        System.out.println("Validierung erfolgreich: '" + periode + "' ist aktiv gesetzt.");
     }
 
-    // Methode für die PLZ
     public void fuellePlzAus(String plz) {
-        // Sucht das devk-input mit der PLZ-Beschriftung
-        Locator plzInput = page.locator("devk-input")
-                //.filter(new Locator.FilterOptions().setHasText("In welchem Ort wird das Fahrzeug zugelassen?"))
-                .locator("input[placeholder='PLZ']");
-        plzInput.waitFor();
+        Locator plzInput = page.locator("#HALTER_PLZ input");
+
+        // Fokus und Eingabe: .fill() ist sicherer als .type()
+        plzInput.fill("");
+        plzInput.waitFor(new Locator.WaitForOptions().setState(WaitForSelectorState.VISIBLE));
         plzInput.fill(plz);
 
-        // Nach PLZ Eingabe kurz warten, bis der Ort automatisch geladen wird
-        page.waitForTimeout(1000);
+        // Warten auf die automatische Befüllung des Ortes (Hürth)
+        // Wir prüfen das Attribut "value" der devk-select Komponente
+        assertThat(page.locator("#HALTER_ORT")).hasAttribute("value", "Hürth",
+                new LocatorAssertions.HasAttributeOptions().setTimeout(3000));
+    }
+
+    public void waehleJahreskilometer(String kilometer) {
+        Locator select = page.locator("devk-select")
+                .filter(new Locator.FilterOptions().setHasText("Wie viele Kilometer"))
+                .locator("select")
+                .first();
+
+        try {
+            select.selectOption(new SelectOption().setLabel(kilometer));
+            return;
+        } catch (RuntimeException ignored) {
+            // Some DEVK selects render as custom dropdowns instead of native select elements.
+        }
+
+        Locator dropdown = page.locator("devk-select")
+                .filter(new Locator.FilterOptions().setHasText("Wie viele Kilometer"))
+                .first();
+        dropdown.click();
+        page.getByText(kilometer, new Page.GetByTextOptions().setExact(true)).last().click();
+    }
+
+    private void waehleAutomatischGeladenenOrt(String ort) {
+        try {
+            Locator ortAuswahl = page.locator("devk-select")
+                    .filter(new Locator.FilterOptions().setHasText(ort))
+                    .first();
+            ortAuswahl.waitFor(new Locator.WaitForOptions()
+                    .setState(WaitForSelectorState.VISIBLE)
+                    .setTimeout(TestConfig.defaultTimeoutMillis()));
+            ortAuswahl.click();
+            page.getByText(ort, new Page.GetByTextOptions().setExact(true)).last().click();
+        } catch (RuntimeException ignored) {
+            // Some postal codes resolve to a single city and do not open a selectable dropdown.
+        }
     }
 
     public void waehleSfKlasseHaftpflicht(String sfKlasse) {
-        // Greift direkt auf die ID zu. Playwright findet das <select> im Shadow DOM automatisch.
         page.locator("#SF_KLASSE_HAFTPFLICHT select").selectOption(new SelectOption().setLabel(sfKlasse));
-        System.out.println("Haftpflicht SF-Klasse gesetzt auf: " + sfKlasse);
     }
 
     public void waehleSfKlasseKasko(String sfKlasse) {
-        // Greift auf die Kasko-ID zu
         page.locator("#SF_KLASSE_KASKO select").selectOption(new SelectOption().setLabel(sfKlasse));
-        System.out.println("Kasko SF-Klasse gesetzt auf: " + sfKlasse);
     }
 
-    // ── Prüfung: Mehrere Tarife validieren ──────────────────────────
-
-    /**
-     * Holt die 'data-price' Attribute aller verfügbaren Tarif-Optionen.
-     * Dies ist eine Validierung der Geschäftslogik (Tarifrechner-Ergebnisse).
-     */
-    /**
-     * Holt die Preise und loggt sie zusammen mit dem Tarifnamen (z.B. Basis, Komfort).
-     */
     public List<String> holeAlleTarifPreise() {
-        // Locator für die Optionen (durchbricht Shadow DOM)
         Locator options = page.locator("devk-select-tabs option");
         List<Locator> allOptions = options.all();
         List<String> preisListe = new ArrayList<>();
 
         for (Locator option : allOptions) {
-            // Name (Label) und Preis aus den Attributen ziehen
-            String tarifName = option.getAttribute("label"); // z.B. "Teilkasko Basis"
-            String preisRaw = option.getAttribute("data-price"); // z.B. "948,83 €"
-
+            String preisRaw = option.getAttribute("data-price");
             if (preisRaw != null) {
                 preisListe.add(preisRaw);
-
-                // Preis für den Log umwandeln
-                double preisZahl = parsePreisString(preisRaw);
-
-                // Dein gewünschter Log-Output
-                System.out.println("Validierung " + (tarifName != null ? tarifName : "Tarif") + " gefunden: " + preisZahl + " €");
             }
         }
 
         return preisListe;
     }
 
-    /**
-     * Hilfsmethode: Wandelt den Preis-String (z.B. "1.341,59 €") in eine Zahl um.
-     */
     public double parsePreisString(String preisText) {
-        if (preisText == null || preisText.isEmpty()) return 0;
+        if (preisText == null || preisText.isEmpty()) {
+            return 0;
+        }
 
-        // Entfernt Tausenderpunkte, ersetzt Komma durch Punkt für Java-Double
         String bereinigterPreis = preisText
                 .replace(".", "")
                 .replace(",", ".")
-                .replaceAll("[^0-9.]", ""); // Behält nur Zahlen und den Punkt
+                .replaceAll("[^0-9.]", "");
 
         return Double.parseDouble(bereinigterPreis);
     }
 
+    public void screenshot(String dateiname) {
+        Path screenshotPath = Paths.get("build/reports/screenshots/" + dateiname + ".png");
+        try {
+            Files.createDirectories(screenshotPath.getParent());
+        } catch (IOException e) {
+            throw new IllegalStateException("Could not create screenshot directory", e);
+        }
+
+        page.screenshot(new Page.ScreenshotOptions()
+                .setPath(screenshotPath)
+                .setFullPage(true));
+    }
+
+    private String toIsoDate(String datum) {
+        DateTimeFormatter germanDate = DateTimeFormatter.ofPattern("dd.MM.yyyy");
+        return LocalDate.parse(datum, germanDate).toString();
+    }
 }

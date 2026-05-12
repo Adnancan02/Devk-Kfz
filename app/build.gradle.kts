@@ -35,11 +35,15 @@ tasks.withType<JavaCompile> {
 }
 
 tasks.test {
-    useJUnit();
-    // UTF-8 für Test-Ausführung
+    useJUnit()
     systemProperty("file.encoding", "UTF-8")
 
-    listOf("browser", "headless", "baseUrl", "timeout", "keepVideos", "cucumber.filter.tags").forEach {
-        System.getProperty(it)?.let { value -> systemProperty(it, value) }
+    // Daha güvenli bir aktarma yöntemi
+    val properties = listOf("browser", "headless", "baseUrl", "timeout", "keepVideos", "cucumber.filter.tags")
+    properties.forEach { prop ->
+        val value = System.getProperty(prop)
+        if (!value.isNullOrBlank()) {
+            systemProperty(prop, value)
+        }
     }
 }

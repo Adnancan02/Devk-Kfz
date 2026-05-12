@@ -4,7 +4,7 @@ public class TestConfig {
 
     private static final String DEFAULT_BASE_URL = "https://www.devk.de/";
     private static final String DEFAULT_BROWSER = "chromium";
-    private static final String DEFAULT_HEADLESS = "true";
+    private static final String DEFAULT_HEADLESS = "false";
 
     private TestConfig() {
     }
